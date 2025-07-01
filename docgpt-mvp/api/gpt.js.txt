@@ -1,0 +1,43 @@
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST allowed' });
+  }
+
+  const { log, weeklySummary, type } = req.body;
+
+  const messages = [];
+
+  if (type === 'daily') {
+    messages.push(
+      { role: "system", content: "You are a friendly health advisor AI helping users live healthier lives by analyzing their daily health logs." },
+      { role: "user", content: `Here is my health log for today:\nDate: ${log.date}\nSleep: ${log.sleep} hours\nSteps: ${log.steps}\nMeals: ${log.meals}\nMood: ${log.mood}\nSymptoms: ${log.symptoms}\n\nCan you give me some health advice or suggestions based on this?` }
+    );
+  } else if (type === 'weekly') {
+    messages.push(
+      { role: "system", content: "You are a helpful AI doctor summarizing weekly health trends." },
+      { role: "user", content: `Here is my weekly health: I averaged ${weeklySummary.avgSleep} hours of sleep, walked ${weeklySummary.totalSteps} steps, felt ${weeklySummary.commonMood} most days, and experienced symptoms like ${Object.keys(weeklySummary.symptomFrequency).join(', ')}. Can you provide feedback or recommendations?` }
+    );
+  }
+
+  try {
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages
+      })
+    });
+
+    const data = await openaiRes.json();
+    const reply = data.choices?.[0]?.message?.content || "No response from DocGPT.";
+    res.status(200).json({ reply });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error contacting OpenAI." });
+  }
+}
